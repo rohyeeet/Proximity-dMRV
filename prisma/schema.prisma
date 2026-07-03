@@ -8,6 +8,10 @@
 
 generator client {
   provider = "prisma-client-js"
+  // "native" covers local dev (macOS/Windows/whatever you're on); "debian-openssl-3.0.x" covers
+  // the node:20-bookworm-slim base image used by the Cloud Run Dockerfile. Vercel's build
+  // environment is handled automatically by Vercel's own Prisma integration.
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
