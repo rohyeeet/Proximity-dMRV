@@ -67,7 +67,7 @@ export function CollectFormClient({
 
   if (submitted) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-surface p-8 text-center">
+      <div className="flex min-h-[65vh] flex-col items-center justify-center gap-3 rounded-lg border border-border bg-surface p-8 text-center">
         <CheckCircle2 className="size-10 text-good-text" />
         <p className="text-[15px] font-semibold text-ink">
           {resubmitSubmissionId ? "Resubmitted for review" : "Submitted"}
@@ -77,12 +77,12 @@ export function CollectFormClient({
             ? "Your corrected answers have been sent back to the reviewer."
             : "Your response has been recorded and is awaiting review."}
         </p>
-        <div className="mt-2 flex gap-2">
-          <Button variant="secondary" onClick={() => router.push("/collect")}>
-            Back to forms
-          </Button>
-          <Button variant="primary" onClick={() => router.push("/collect/submissions")}>
+        <div className="mt-3 flex w-full flex-col gap-2">
+          <Button variant="primary" onClick={() => router.push("/collect/submissions")} className="w-full justify-center">
             View my submissions
+          </Button>
+          <Button variant="secondary" onClick={() => router.push("/collect")} className="w-full justify-center">
+            Back to forms
           </Button>
         </div>
       </div>
