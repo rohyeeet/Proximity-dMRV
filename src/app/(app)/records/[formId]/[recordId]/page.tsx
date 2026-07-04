@@ -11,13 +11,26 @@ export default async function RecordDetailPage({ params }: { params: Promise<{ f
     getFormTemplateVersionFields(formId, submission.formTemplateVersionNo),
   ]);
 
+  const fields = pinnedFields ?? form.currentVersion.fields;
+  const linkFieldCodes = new Set(
+    fields.filter((f) => f.fieldType === "linked_record" || (f.fieldType === "lookup_select" && f.lookupSource?.kind === "internal_form")).map((f) => f.fieldCode)
+  );
+  const linkedIds = submission.answers
+    .filter((a) => linkFieldCodes.has(a.fieldCode) && typeof a.value === "string" && a.value)
+    .map((a) => a.value as string);
+  const linkedSubmissions = await Promise.all(linkedIds.map((id) => getSubmission(id)));
+  const linkedRecordsById = Object.fromEntries(
+    linkedSubmissions.filter((s) => s !== undefined).map((s) => [s!.id, { formTemplateId: s!.formTemplateId, displayId: s!.displayId }])
+  );
+
   return (
     <RecordDetailClient
       form={form}
-      fields={pinnedFields ?? form.currentVersion.fields}
+      fields={fields}
       isStaleVersion={submission.formTemplateVersionNo !== form.currentVersion.versionNo}
       submission={submission}
       submitterName={submitter?.fullName ?? "Unknown"}
+      linkedRecordsById={linkedRecordsById}
     />
   );
 }

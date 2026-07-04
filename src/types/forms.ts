@@ -71,6 +71,8 @@ export interface LookupSource {
   sourceFieldCode?: string;
   /** kind: "internal_form" — narrows which of the source form's records are eligible, e.g. status = approved */
   filter?: LinkFilter;
+  /** kind: "internal_form" — hide any record already linked from elsewhere (e.g. a batch already sampled once) */
+  excludeAlreadyLinked?: boolean;
   deviceId?: string;
   telemetryParameterCode?: string;
   refreshSeconds?: number;
@@ -92,6 +94,8 @@ export interface FormFieldDefinition {
   linkedFormTemplateId?: string;
   /** linked_record only — narrows which records of the linked entity are eligible, e.g. batch_status = approved */
   linkedFilter?: LinkFilter;
+  /** linked_record only — hide any record already linked from elsewhere (e.g. a batch already sampled once) */
+  linkedExclusive?: boolean;
   validations: ValidationRule[];
   visibilityRules?: VisibilityRule[];
   visibleToRoleTiers?: string[];

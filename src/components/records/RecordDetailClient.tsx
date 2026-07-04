@@ -19,12 +19,14 @@ export function RecordDetailClient({
   isStaleVersion,
   submission,
   submitterName,
+  linkedRecordsById,
 }: {
   form: FormTemplate;
   fields: FormFieldDefinition[];
   isStaleVersion: boolean;
   submission: Submission;
   submitterName: string;
+  linkedRecordsById: Record<string, { formTemplateId: string; displayId: string }>;
 }) {
   const { session } = useSession();
   const canActOnReview = canReview(session.role.tier);
@@ -102,11 +104,21 @@ export function RecordDetailClient({
                 {fields.map((field) => {
                   const answer = submission.answers.find((a) => a.fieldCode === field.fieldCode)?.value;
                   const isEmpty = answer === "" || answer === undefined || answer === null;
+                  const isLinkField = field.fieldType === "linked_record" || (field.fieldType === "lookup_select" && field.lookupSource?.kind === "internal_form");
+                  const linked = !isEmpty && isLinkField ? linkedRecordsById[String(answer)] : undefined;
                   return (
                     <div key={field.id}>
                       <dt className="text-[12px] text-ink-soft">{field.label}</dt>
                       <dd className={isEmpty ? "text-[13.5px] font-medium text-critical-text" : "text-[13.5px] font-medium text-ink"}>
-                        {isEmpty ? "Missing" : String(answer)}
+                        {isEmpty ? (
+                          "Missing"
+                        ) : linked ? (
+                          <Link href={`/records/${linked.formTemplateId}/${answer}`} className="text-brand-600 hover:underline">
+                            {linked.displayId}
+                          </Link>
+                        ) : (
+                          String(answer)
+                        )}
                         {field.unit && !isEmpty ? ` ${field.unit}` : ""}
                       </dd>
                     </div>

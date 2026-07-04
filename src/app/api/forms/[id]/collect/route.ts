@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireFormCollectAccess } from "@/lib/authz";
 import { toSubmission } from "@/lib/mappers";
-import { getLatestPublishedVersion } from "@/lib/queries";
+import { deriveLinkedSubmissionIds, getLatestPublishedVersion } from "@/lib/queries";
 import { genId } from "@/lib/utils";
+import type { FormFieldDefinition } from "@/types";
 
 /** Real field submissions — created from the Collect app, never test data. Only ever submitted
  * against the form's latest *published* version, never an in-progress Studio draft. */
@@ -20,6 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const body = await request.json();
   const answers = Array.isArray(body.answers) ? body.answers : [];
+  const linkedSubmissionIds = deriveLinkedSubmissionIds(version.fields as unknown as FormFieldDefinition[], answers);
 
   const flowNode = await prisma.flowTemplate
     .findMany({ where: { domainPackId: form.domainPackId } })
@@ -43,7 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       evidence: [],
       versions: [{ versionNo: 1, answers, createdAt: now.toISOString(), createdByUserId: access.userId }],
       reviewActions: [],
-      linkedSubmissionIds: [],
+      linkedSubmissionIds,
       smartCheckSummary: "Awaiting review.",
       isTest: false,
     },

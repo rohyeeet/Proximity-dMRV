@@ -25,13 +25,28 @@ import type {
   FlowTemplate,
   FormFieldDefinition,
   FormTemplate,
+  LinkFilter,
   Organization,
   Role,
   Stage,
   Submission,
+  SubmissionAnswer,
   TelemetryStream,
   User,
 } from "@/types";
+
+/** Which of a form's fields actually reference another submission at runtime — the field types
+ * `LinkedRecordPicker` resolves to a real record id, as opposed to a plain typed-in value. */
+export function deriveLinkedSubmissionIds(fields: FormFieldDefinition[], answers: SubmissionAnswer[]): string[] {
+  const linkFieldCodes = new Set(
+    fields
+      .filter((f) => f.fieldType === "linked_record" || (f.fieldType === "lookup_select" && f.lookupSource?.kind === "internal_form"))
+      .map((f) => f.fieldCode)
+  );
+  return answers
+    .filter((a) => linkFieldCodes.has(a.fieldCode) && typeof a.value === "string" && a.value.trim() !== "")
+    .map((a) => a.value as string);
+}
 
 export async function getRole(id: string): Promise<Role | undefined> {
   const row = await prisma.role.findUnique({ where: { id } });
@@ -165,6 +180,74 @@ export async function getSubmission(id: string): Promise<Submission | undefined>
 export async function getSubmissionsByUser(userId: string): Promise<Submission[]> {
   const rows = await prisma.submission.findMany({ where: { submittedByUserId: userId, isTest: false }, orderBy: { updatedAt: "desc" } });
   return rows.map(toSubmission);
+}
+
+export interface LinkCandidate {
+  id: string;
+  displayId: string;
+  summary: string;
+}
+
+function matchesFilter(submission: Submission, filter: LinkFilter): boolean {
+  const answer = submission.answers.find((a) => a.fieldCode === filter.fieldCode);
+  const value = String(answer?.value ?? "");
+  switch (filter.operator) {
+    case "equals":
+      return value === filter.value;
+    case "not_equals":
+      return value !== filter.value;
+    case "contains":
+      return value.toLowerCase().includes(filter.value.toLowerCase());
+  }
+}
+
+function summarizeAnswers(submission: Submission): string {
+  const parts = submission.answers
+    .filter((a) => a.value !== null && a.value !== undefined && String(a.value).trim() !== "")
+    .slice(0, 2)
+    .map((a) => String(a.value));
+  return parts.join(" · ");
+}
+
+/**
+ * Real candidates for a linked_record / internal-form lookup_select field — the runtime half of
+ * the Studio-configured relationship (source form + optional value filter + optional exclusivity).
+ * Scoped to the caller's own organization even though a domain pack can be shared by several orgs,
+ * and (when requested) excludes anything already claimed by another submission's linkedSubmissionIds.
+ */
+export async function getLinkCandidates(params: {
+  formTemplateId: string;
+  organizationId: string;
+  filter?: LinkFilter;
+  excludeClaimed?: boolean;
+}): Promise<LinkCandidate[]> {
+  const { formTemplateId, organizationId, filter, excludeClaimed } = params;
+
+  const rows = await prisma.submission.findMany({
+    where: {
+      formTemplateId,
+      isTest: false,
+      submittedBy: { memberships: { some: { organizationId, status: "active" } } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 200,
+  });
+  let candidates = rows.map(toSubmission);
+
+  if (filter) {
+    candidates = candidates.filter((s) => matchesFilter(s, filter));
+  }
+
+  if (excludeClaimed && candidates.length > 0) {
+    const claimed = await prisma.submission.findMany({
+      where: { linkedSubmissionIds: { hasSome: candidates.map((c) => c.id) } },
+      select: { linkedSubmissionIds: true },
+    });
+    const claimedIds = new Set(claimed.flatMap((c) => c.linkedSubmissionIds));
+    candidates = candidates.filter((s) => !claimedIds.has(s.id));
+  }
+
+  return candidates.map((s) => ({ id: s.id, displayId: s.displayId, summary: summarizeAnswers(s) }));
 }
 
 export async function getConnectorsByOrganization(organizationId: string): Promise<Connector[]> {

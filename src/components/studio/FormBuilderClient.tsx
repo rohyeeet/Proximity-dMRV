@@ -367,6 +367,15 @@ function FieldPropertiesPanel({
                 fields={linkedForm.currentVersion.fields}
                 onChange={(filter) => onChange({ linkedFilter: filter })}
               />
+              <label className="mt-2 flex items-center gap-2 text-[12.5px] text-ink">
+                <input
+                  type="checkbox"
+                  checked={field.linkedExclusive ?? false}
+                  onChange={(e) => onChange({ linkedExclusive: e.target.checked })}
+                  className="size-3.5 accent-brand-500"
+                />
+                Don&apos;t show records already linked elsewhere
+              </label>
             </div>
           )}
         </div>

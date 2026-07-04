@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { toSubmission } from "@/lib/mappers";
+import { deriveLinkedSubmissionIds, getFormTemplateVersionFields } from "@/lib/queries";
 import type { SubmissionAnswer, SubmissionVersionRecord } from "@/types";
 
 /** A submitter fixing and resending a submission a reviewer returned for correction. Only the
@@ -27,6 +28,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const now = new Date();
   const nextVersionNo = existing.currentVersionNo + 1;
   const priorVersions = existing.versions as unknown as SubmissionVersionRecord[];
+  const fields = (await getFormTemplateVersionFields(existing.formTemplateId, existing.formTemplateVersionNo)) ?? [];
+  const linkedSubmissionIds = deriveLinkedSubmissionIds(fields, answers);
 
   const updated = await prisma.submission.update({
     where: { id },
@@ -35,6 +38,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       reviewStatus: "needs_check",
       updatedAt: now,
       answers: answers as object,
+      linkedSubmissionIds,
       versions: [
         ...priorVersions,
         { versionNo: nextVersionNo, answers, createdAt: now.toISOString(), createdByUserId: session.user.id, reason: "Resubmitted after correction" },

@@ -1,5 +1,6 @@
 "use client";
 
+import { LinkedRecordPicker } from "@/components/collect/LinkedRecordPicker";
 import type { FormFieldDefinition } from "@/types";
 
 /** Shared between the Form Builder's Preview panel and the field Collect app so both render
@@ -36,9 +37,41 @@ export function renderFieldInput(field: FormFieldDefinition, value: string, onCh
           <option value="false">No</option>
         </select>
       );
-    case "lookup_select":
     case "linked_record":
-      return <input disabled value={value || "(picked from connected records)"} className={fieldDisabledClass} />;
+      return (
+        <LinkedRecordPicker
+          sourceFormTemplateId={field.linkedFormTemplateId}
+          filter={field.linkedFilter}
+          excludeClaimed={field.linkedExclusive}
+          value={value}
+          onChange={onChange}
+        />
+      );
+    case "lookup_select":
+      if (field.lookupSource?.kind === "internal_form") {
+        return (
+          <LinkedRecordPicker
+            sourceFormTemplateId={field.lookupSource.sourceFormTemplateId}
+            filter={field.lookupSource.filter}
+            excludeClaimed={field.lookupSource.excludeAlreadyLinked}
+            value={value}
+            onChange={onChange}
+          />
+        );
+      }
+      return (
+        <input
+          disabled
+          value={
+            field.lookupSource?.kind === "device_telemetry"
+              ? "Live device reading — not yet connected"
+              : field.lookupSource?.kind === "external_db"
+                ? "External database lookup — not yet connected"
+                : "Not configured yet"
+          }
+          className={fieldDisabledClass}
+        />
+      );
     case "calculated_field":
       return <input disabled value="(computed automatically)" className={fieldDisabledClass} />;
     default:

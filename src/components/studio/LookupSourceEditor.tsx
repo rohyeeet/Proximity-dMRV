@@ -94,6 +94,15 @@ export function LookupSourceEditor({
                   onChange={(filter) => onChange({ ...lookupSource!, filter })}
                 />
               </div>
+              <label className="flex items-center gap-2 text-[12.5px] text-ink">
+                <input
+                  type="checkbox"
+                  checked={lookupSource?.excludeAlreadyLinked ?? false}
+                  onChange={(e) => onChange({ ...lookupSource!, excludeAlreadyLinked: e.target.checked })}
+                  className="size-3.5 accent-brand-500"
+                />
+                Don&apos;t show records already linked elsewhere
+              </label>
             </>
           )}
           <div>

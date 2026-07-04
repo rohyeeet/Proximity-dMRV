@@ -21,6 +21,17 @@ export default async function CollectSubmissionDetailPage({ params }: { params: 
   ]);
   if (!form) notFound();
 
+  const linkFieldCodes = new Set(
+    (fields ?? [])
+      .filter((f) => f.fieldType === "linked_record" || (f.fieldType === "lookup_select" && f.lookupSource?.kind === "internal_form"))
+      .map((f) => f.fieldCode)
+  );
+  const linkedIds = submission.answers
+    .filter((a) => linkFieldCodes.has(a.fieldCode) && typeof a.value === "string" && a.value)
+    .map((a) => a.value as string);
+  const linkedSubmissions = await Promise.all(linkedIds.map((linkedId) => getSubmission(linkedId)));
+  const linkedDisplayIdById = Object.fromEntries(linkedSubmissions.filter((s) => s !== undefined).map((s) => [s!.id, s!.displayId]));
+
   return (
     <div className="flex flex-col gap-4">
       <Link href="/collect/submissions" className="inline-flex items-center gap-1.5 text-[13px] font-medium text-ink-soft">
@@ -65,11 +76,12 @@ export default async function CollectSubmissionDetailPage({ params }: { params: 
           {(fields ?? []).map((field) => {
             const answer = submission.answers.find((a) => a.fieldCode === field.fieldCode)?.value;
             const isEmpty = answer === "" || answer === undefined || answer === null;
+            const displayValue = !isEmpty && linkedDisplayIdById[String(answer)] ? linkedDisplayIdById[String(answer)] : String(answer);
             return (
               <div key={field.id}>
                 <dt className="text-[12px] text-ink-soft">{field.label}</dt>
                 <dd className={isEmpty ? "text-[13.5px] text-ink-soft/60" : "text-[13.5px] font-medium text-ink"}>
-                  {isEmpty ? "—" : String(answer)}
+                  {isEmpty ? "—" : displayValue}
                   {field.unit && !isEmpty ? ` ${field.unit}` : ""}
                 </dd>
               </div>
