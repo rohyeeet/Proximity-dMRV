@@ -78,6 +78,10 @@ export function toUser(row: UserRow): User {
     avatarInitials: row.avatarInitials,
     status: row.status as User["status"],
     isPlatformAdmin: row.isPlatformAdmin,
+    mobileNumber: row.mobileNumber ?? undefined,
+    country: row.country ?? undefined,
+    state: row.state ?? undefined,
+    district: row.district ?? undefined,
   };
 }
 

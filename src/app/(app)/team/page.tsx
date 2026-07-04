@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { KeyRound } from "lucide-react";
 import { useSession } from "@/lib/session";
+import { canManageTeam } from "@/lib/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { DataTable, type DataTableColumn } from "@/components/ui/DataTable";
 import { StatusChip } from "@/components/ui/StatusChip";
 import { Button } from "@/components/ui/Button";
+import { InviteUserModal } from "@/components/team/InviteUserModal";
 import type { OrgMembership, Role, User } from "@/types";
 
 const tierLabel: Record<string, string> = {
@@ -26,23 +29,25 @@ interface MemberRow {
 
 export default function TeamPage() {
   const { session } = useSession();
+  const canInvite = canManageTeam(session.role.tier);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [orgRoles, setOrgRoles] = useState<Role[]>([]);
+  const [showInvite, setShowInvite] = useState(false);
+  const [justInvited, setJustInvited] = useState<{ name: string; tempPassword: string } | null>(null);
 
-  useEffect(() => {
-    let cancelled = false;
+  function loadTeam() {
     fetch(`/api/organizations/${session.organization.id}/team`)
       .then((res) => res.json())
       .then((data: { members: MemberRow[]; roles: Role[] }) => {
-        if (!cancelled) {
-          setMembers(data.members);
-          setOrgRoles(data.roles);
-        }
+        setMembers(data.members);
+        setOrgRoles(data.roles);
       })
       .catch((error) => console.error("Failed to load team", error));
-    return () => {
-      cancelled = true;
-    };
+  }
+
+  useEffect(() => {
+    loadTeam();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session.organization.id]);
 
   const columns: DataTableColumn<MemberRow>[] = [
@@ -76,8 +81,42 @@ export default function TeamPage() {
         eyebrow={session.organization.name}
         title="Team & Access"
         description="Custom roles composed from the platform's five permission primitives, scoped to whatever projects an Org Admin decides."
-        actions={<Button variant="primary">Invite user</Button>}
+        actions={
+          canInvite ? (
+            <Button variant="primary" onClick={() => setShowInvite(true)} disabled={orgRoles.length === 0}>
+              Invite user
+            </Button>
+          ) : undefined
+        }
       />
+
+      {canInvite && (
+        <InviteUserModal
+          open={showInvite}
+          onClose={() => setShowInvite(false)}
+          organizationId={session.organization.id}
+          roles={orgRoles}
+          onInvited={({ user, tempPassword }) => {
+            loadTeam();
+            if (tempPassword) setJustInvited({ name: user.fullName, tempPassword });
+          }}
+        />
+      )}
+
+      {justInvited && (
+        <div className="mb-4 flex items-start gap-3 rounded-lg border border-brand-500/30 bg-brand-50 p-4">
+          <KeyRound className="mt-0.5 size-4 shrink-0 text-brand-600" />
+          <div className="flex-1">
+            <p className="text-[13px] font-medium text-brand-700">
+              {justInvited.name} is set up — share this temporary password with them directly (it won&apos;t be shown again):
+            </p>
+            <p className="mt-1 font-mono text-[14px] font-semibold text-ink">{justInvited.tempPassword}</p>
+          </div>
+          <button onClick={() => setJustInvited(null)} className="text-[12px] text-brand-600 hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <h2 className="mb-3 text-[13px] font-semibold uppercase tracking-wide text-ink-soft">Members</h2>
       <DataTable columns={columns} rows={members} rowKey={(row) => row.membership.id} />

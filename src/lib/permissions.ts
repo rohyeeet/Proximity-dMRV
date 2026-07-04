@@ -19,3 +19,9 @@ export function canDeleteStage(tier: RoleTier): boolean {
 export function canReview(tier: RoleTier): boolean {
   return tier === "platform" || tier === "org_admin" || tier === "org_sub_admin" || tier === "reviewer";
 }
+
+/** Inviting/managing team members — matches exactly who the seeded role data claims can do this
+ * ("manage users" / "invite users"); designers aren't listed as able to manage people anywhere. */
+export function canManageTeam(tier: RoleTier): boolean {
+  return tier === "platform" || tier === "org_admin" || tier === "org_sub_admin";
+}

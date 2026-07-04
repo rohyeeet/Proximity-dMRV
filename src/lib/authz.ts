@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { canEditStudio, canDeleteStage, canReview } from "@/lib/permissions";
+import { canEditStudio, canDeleteStage, canReview, canManageTeam } from "@/lib/permissions";
 import type { RoleTier } from "@/types";
 
 type AccessResult = { ok: true; userId: string } | { ok: false; status: 401 | 403; message: string };
@@ -166,6 +166,33 @@ export async function requireReviewAccess(domainPackId: string): Promise<AccessR
 
   if (!canDoReview) {
     return { ok: false, status: 403, message: "Only a reviewer can approve or return a submission" };
+  }
+  return { ok: true, userId: user.id };
+}
+
+/** Inviting/managing team members is org-scoped, not domain-pack-scoped — same shape as
+ * requireOrgEditAccess but gated on canManageTeam instead of canEditStudio. */
+export async function requireTeamManageAccess(organizationId: string): Promise<AccessResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, status: 401, message: "Not authenticated" };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!user || user.status !== "active") {
+    return { ok: false, status: 401, message: "Not authenticated" };
+  }
+
+  if (user.isPlatformAdmin) {
+    return { ok: true, userId: user.id };
+  }
+
+  const membership = await prisma.orgMembership.findFirst({
+    where: { userId: user.id, organizationId, status: "active" },
+    include: { role: true },
+  });
+  if (!membership || !canManageTeam(membership.role.tier as RoleTier)) {
+    return { ok: false, status: 403, message: "Only an admin can manage team members for this organization" };
   }
   return { ok: true, userId: user.id };
 }

@@ -66,6 +66,11 @@ model User {
   // Platform tier is cross-org and intentionally NOT modeled as an OrgMembership (a platform
   // admin isn't "a member" of any one org) — matches src/types/identity.ts's CurrentSession.isPlatformAdmin.
   isPlatformAdmin Boolean @default(false)
+  // Onboarding profile details, captured when a Team & Access admin invites someone.
+  mobileNumber String?
+  country      String?
+  state        String?
+  district     String?
 
   memberships   OrgMembership[]
   submissions   Submission[]   @relation("SubmittedBy")

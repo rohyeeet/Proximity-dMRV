@@ -21,6 +21,10 @@ export interface User {
   status: "active" | "invited" | "disabled";
   /** Platform tier is cross-org and intentionally not modeled as an OrgMembership. */
   isPlatformAdmin?: boolean;
+  mobileNumber?: string;
+  country?: string;
+  state?: string;
+  district?: string;
 }
 
 export interface Role {
