@@ -90,6 +90,12 @@ export async function getFormTemplateVersionFields(formTemplateId: string, versi
   return version ? (version.fields as unknown as FormFieldDefinition[]) : undefined;
 }
 
+/** The version submitters actually fill out — real field data is only ever collected against
+ * what's been published, never an in-progress draft. */
+export async function getLatestPublishedVersion(formTemplateId: string) {
+  return prisma.formTemplateVersion.findFirst({ where: { formTemplateId, status: "published" }, orderBy: { versionNo: "desc" } });
+}
+
 export async function getFormTemplatesByDomainPack(domainPackId: string): Promise<FormTemplate[]> {
   const rows = await prisma.formTemplate.findMany({ where: { domainPackId } });
   const results: FormTemplate[] = [];
@@ -153,6 +159,12 @@ export async function getTestSubmissionsByForm(formTemplateId: string): Promise<
 export async function getSubmission(id: string): Promise<Submission | undefined> {
   const row = await prisma.submission.findUnique({ where: { id } });
   return row ? toSubmission(row) : undefined;
+}
+
+/** A submitter's own submission history for the Collect app's "My submissions" list. */
+export async function getSubmissionsByUser(userId: string): Promise<Submission[]> {
+  const rows = await prisma.submission.findMany({ where: { submittedByUserId: userId, isTest: false }, orderBy: { updatedAt: "desc" } });
+  return rows.map(toSubmission);
 }
 
 export async function getConnectorsByOrganization(organizationId: string): Promise<Connector[]> {

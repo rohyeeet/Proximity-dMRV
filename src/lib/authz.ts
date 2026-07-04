@@ -1,6 +1,6 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { canEditStudio, canDeleteStage } from "@/lib/permissions";
+import { canEditStudio, canDeleteStage, canReview } from "@/lib/permissions";
 import type { RoleTier } from "@/types";
 
 type AccessResult = { ok: true; userId: string } | { ok: false; status: 401 | 403; message: string };
@@ -111,6 +111,61 @@ export async function requireStageDeleteAccess(domainPackId: string): Promise<Ac
 
   if (!canDelete) {
     return { ok: false, status: 403, message: "Only an admin can delete a stage" };
+  }
+  return { ok: true, userId: user.id };
+}
+
+/** Any active member of an org using this domain pack can submit real field data — the Collect
+ * app's equivalent of requireOrgAccess, just keyed by domain pack since the caller doesn't send
+ * their org id (it's resolved from their own membership, not trusted from the client). */
+export async function requireFormCollectAccess(domainPackId: string): Promise<AccessResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, status: 401, message: "Not authenticated" };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!user || user.status !== "active") {
+    return { ok: false, status: 401, message: "Not authenticated" };
+  }
+
+  if (user.isPlatformAdmin) {
+    return { ok: true, userId: user.id };
+  }
+
+  const membership = await prisma.orgMembership.findFirst({
+    where: { userId: user.id, status: "active", organization: { domainPackId } },
+  });
+  if (!membership) {
+    return { ok: false, status: 403, message: "You don't have access to this domain pack" };
+  }
+  return { ok: true, userId: user.id };
+}
+
+/** Approve/return-for-correction is a reviewer-or-above capability. */
+export async function requireReviewAccess(domainPackId: string): Promise<AccessResult> {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return { ok: false, status: 401, message: "Not authenticated" };
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!user || user.status !== "active") {
+    return { ok: false, status: 401, message: "Not authenticated" };
+  }
+
+  if (user.isPlatformAdmin) {
+    return { ok: true, userId: user.id };
+  }
+
+  const memberships = await prisma.orgMembership.findMany({
+    where: { userId: user.id, status: "active", organization: { domainPackId } },
+    include: { role: true },
+  });
+  const canDoReview = memberships.some((membership) => canReview(membership.role.tier as RoleTier));
+
+  if (!canDoReview) {
+    return { ok: false, status: 403, message: "Only a reviewer can approve or return a submission" };
   }
   return { ok: true, userId: user.id };
 }

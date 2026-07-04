@@ -6,6 +6,8 @@ import { ArrowLeft, FileImage, MapPin, ScanLine, PenTool } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { ReviewStatusChip, SyncStatusChip } from "@/components/ui/StatusChip";
+import { useSession } from "@/lib/session";
+import { canReview } from "@/lib/permissions";
 import { formatDate, formatRelativeTime } from "@/lib/utils";
 import type { FormFieldDefinition, FormTemplate, ReviewActionRecord, Submission } from "@/types";
 
@@ -24,34 +26,41 @@ export function RecordDetailClient({
   submission: Submission;
   submitterName: string;
 }) {
+  const { session } = useSession();
+  const canActOnReview = canReview(session.role.tier);
   const [reviewStatus, setReviewStatus] = useState(submission.reviewStatus);
   const [reviewActions, setReviewActions] = useState<ReviewActionRecord[]>(submission.reviewActions);
   const [isReturning, setIsReturning] = useState(false);
   const [reason, setReason] = useState("");
   const [guidance, setGuidance] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function approve() {
-    setReviewStatus("approved");
-    setReviewActions((prev) => [
-      ...prev,
-      { id: `local-${prev.length + 1}`, outcome: "approved", reviewerUserId: "user-rohit", createdAt: new Date().toISOString() },
-    ]);
+  async function submitReview(body: { outcome: string; reason?: string; guidance?: string }) {
+    setSubmitting(true);
+    try {
+      const res = await fetch(`/api/submissions/${submission.id}/review`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const updated: Submission = await res.json();
+      setReviewStatus(updated.reviewStatus);
+      setReviewActions(updated.reviewActions);
+    } catch (error) {
+      console.error("Failed to save review decision", error);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  function sendBack() {
+  function approve() {
+    submitReview({ outcome: "approved" });
+  }
+
+  async function sendBack() {
     if (!reason.trim()) return;
-    setReviewStatus("needs_fix");
-    setReviewActions((prev) => [
-      ...prev,
-      {
-        id: `local-${prev.length + 1}`,
-        outcome: "returned_for_correction",
-        reason,
-        guidance,
-        reviewerUserId: "user-rohit",
-        createdAt: new Date().toISOString(),
-      },
-    ]);
+    await submitReview({ outcome: "returned_for_correction", reason, guidance: guidance || undefined });
     setIsReturning(false);
     setReason("");
     setGuidance("");
@@ -162,6 +171,10 @@ export function RecordDetailClient({
             <CardBody>
               {reviewStatus === "approved" ? (
                 <p className="text-[13px] text-good-text">Approved. This record remains visible in Past Records.</p>
+              ) : reviewStatus === "needs_fix" ? (
+                <p className="text-[13px] text-warn-text">Returned for correction — waiting on the submitter to fix and resend.</p>
+              ) : !canActOnReview ? (
+                <p className="text-[13px] text-ink-soft">Awaiting review.</p>
               ) : isReturning ? (
                 <div className="flex flex-col gap-3">
                   <div>
@@ -184,20 +197,20 @@ export function RecordDetailClient({
                     />
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="danger" size="sm" onClick={sendBack} disabled={!reason.trim()}>
-                      Send back
+                    <Button variant="danger" size="sm" onClick={sendBack} disabled={!reason.trim() || submitting}>
+                      {submitting ? "Sending…" : "Send back"}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setIsReturning(false)}>
+                    <Button variant="ghost" size="sm" onClick={() => setIsReturning(false)} disabled={submitting}>
                       Cancel
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <Button variant="primary" size="sm" onClick={approve}>
-                    Approve
+                  <Button variant="primary" size="sm" onClick={approve} disabled={submitting}>
+                    {submitting ? "Saving…" : "Approve"}
                   </Button>
-                  <Button variant="secondary" size="sm" onClick={() => setIsReturning(true)}>
+                  <Button variant="secondary" size="sm" onClick={() => setIsReturning(true)} disabled={submitting}>
                     Return for correction
                   </Button>
                 </div>

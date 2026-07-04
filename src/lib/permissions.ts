@@ -14,3 +14,8 @@ export function canEditStudio(tier: RoleTier): boolean {
 export function canDeleteStage(tier: RoleTier): boolean {
   return tier === "platform" || tier === "org_admin";
 }
+
+/** Approving/returning a submission is a reviewer-or-above capability — designers/submitters can't. */
+export function canReview(tier: RoleTier): boolean {
+  return tier === "platform" || tier === "org_admin" || tier === "org_sub_admin" || tier === "reviewer";
+}
