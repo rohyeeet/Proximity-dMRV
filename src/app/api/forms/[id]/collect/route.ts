@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db";
 import { requireFormCollectAccess } from "@/lib/authz";
 import { toSubmission } from "@/lib/mappers";
-import { deriveLinkedSubmissionIds, getLatestPublishedVersion } from "@/lib/queries";
+import { assertLinksStillAvailable, deriveExclusiveLinkedSubmissionIds, deriveLinkedSubmissionIds, getLatestPublishedVersion, LinkedRecordConflictError } from "@/lib/queries";
 import { genId } from "@/lib/utils";
 import type { FormFieldDefinition } from "@/types";
 
@@ -22,7 +23,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   const body = await request.json();
   const answers = Array.isArray(body.answers) ? body.answers : [];
   const evidence = Array.isArray(body.evidence) ? body.evidence : [];
-  const linkedSubmissionIds = deriveLinkedSubmissionIds(version.fields as unknown as FormFieldDefinition[], answers);
+  const fields = version.fields as unknown as FormFieldDefinition[];
+  const linkedSubmissionIds = deriveLinkedSubmissionIds(fields, answers);
+  const exclusiveLinkedIds = deriveExclusiveLinkedSubmissionIds(fields, answers);
 
   const flowNode = await prisma.flowTemplate
     .findMany({ where: { domainPackId: form.domainPackId } })
@@ -30,27 +33,43 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const submissionId = genId("submission");
   const now = new Date();
-  const submission = await prisma.submission.create({
-    data: {
-      id: submissionId,
-      displayId: `${form.code.slice(0, 8).toUpperCase()}-${submissionId.slice(-6)}`,
-      formTemplateId: id,
-      formTemplateVersionNo: version.versionNo,
-      flowNodeLabel: flowNode?.label ?? form.name,
-      reviewStatus: "needs_check",
-      syncStatus: "synced",
-      submittedByUserId: access.userId,
-      currentVersionNo: 1,
-      updatedAt: now,
-      answers,
-      evidence,
-      versions: [{ versionNo: 1, answers, createdAt: now.toISOString(), createdByUserId: access.userId }],
-      reviewActions: [],
-      linkedSubmissionIds,
-      smartCheckSummary: "Awaiting review.",
-      isTest: false,
-    },
-  });
 
-  return NextResponse.json(toSubmission(submission));
+  try {
+    const submission = await prisma.$transaction(
+      async (tx) => {
+        await assertLinksStillAvailable(tx, exclusiveLinkedIds);
+        return tx.submission.create({
+          data: {
+            id: submissionId,
+            displayId: `${form.code.slice(0, 8).toUpperCase()}-${submissionId.slice(-6)}`,
+            formTemplateId: id,
+            formTemplateVersionNo: version.versionNo,
+            flowNodeLabel: flowNode?.label ?? form.name,
+            reviewStatus: "needs_check",
+            syncStatus: "synced",
+            submittedByUserId: access.userId,
+            currentVersionNo: 1,
+            updatedAt: now,
+            answers,
+            evidence,
+            versions: [{ versionNo: 1, answers, createdAt: now.toISOString(), createdByUserId: access.userId }],
+            reviewActions: [],
+            linkedSubmissionIds,
+            smartCheckSummary: "Awaiting review.",
+            isTest: false,
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+    return NextResponse.json(toSubmission(submission));
+  } catch (error) {
+    if (error instanceof LinkedRecordConflictError) {
+      return NextResponse.json({ error: "One of the records you selected was just linked by another submission. Please pick again." }, { status: 409 });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      return NextResponse.json({ error: "This submission conflicted with another in-flight change. Please try again." }, { status: 409 });
+    }
+    throw error;
+  }
 }

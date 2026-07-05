@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireReviewAccess } from "@/lib/authz";
+import { requireReviewAccessForOrganization } from "@/lib/authz";
 import { getFormTemplate, getSubmissionsByForm, getUser } from "@/lib/queries";
 import { decodeGeoBoundary, decodeGeoPoint } from "@/lib/form-fields";
 import type { EvidenceFile, FormFieldDefinition } from "@/types";
@@ -34,15 +34,18 @@ function formatAnswerForExport(field: FormFieldDefinition, rawValue: unknown, ev
 /** One row per submission, current form fields as the column set (by label, in sortOrder) —
  * older submissions missing a since-added field just get a blank cell. Media columns are real,
  * clickable hosted URLs; reviewer-or-above only, matching who already sees company-wide data. */
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const organizationId = new URL(request.url).searchParams.get("organizationId");
+  if (!organizationId) return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
+
   const formRow = await prisma.formTemplate.findUnique({ where: { id } });
   if (!formRow) return NextResponse.json({ error: "Form not found" }, { status: 404 });
 
-  const access = await requireReviewAccess(formRow.domainPackId);
+  const access = await requireReviewAccessForOrganization(organizationId);
   if (!access.ok) return NextResponse.json({ error: access.message }, { status: access.status });
 
-  const [form, submissions] = await Promise.all([getFormTemplate(id), getSubmissionsByForm(id)]);
+  const [form, submissions] = await Promise.all([getFormTemplate(id), getSubmissionsByForm(id, organizationId)]);
   if (!form) return NextResponse.json({ error: "Form not found" }, { status: 404 });
 
   const fields = form.currentVersion.fields.slice().sort((a, b) => a.sortOrder - b.sortOrder);

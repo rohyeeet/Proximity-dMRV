@@ -1,13 +1,15 @@
 import { notFound } from "next/navigation";
 import { getFormTemplate, getSubmissionsByForm } from "@/lib/queries";
+import { resolveSession } from "@/lib/session-server";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { RecordsGridClient } from "@/components/records/RecordsGridClient";
 
 export default async function RecordsGridPage({ params }: { params: Promise<{ formId: string }> }) {
   const { formId } = await params;
+  const { initialActiveOrganizationId } = await resolveSession();
   const form = await getFormTemplate(formId);
   if (!form) notFound();
-  const formSubmissions = await getSubmissionsByForm(formId);
+  const formSubmissions = await getSubmissionsByForm(formId, initialActiveOrganizationId);
 
   return (
     <div>

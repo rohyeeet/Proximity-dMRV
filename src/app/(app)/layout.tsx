@@ -13,7 +13,12 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
     redirect("/collect");
   }
 
-  const [initialForms, initialFlows, initialStages] = await Promise.all([getAllFormTemplates(), getAllFlowTemplates(), getAllStages()]);
+  const domainPackIds = [...new Set(accessibleOrgs.map((entry) => entry.organization.domainPackId))];
+  const [initialForms, initialFlows, initialStages] = await Promise.all([
+    getAllFormTemplates(domainPackIds),
+    getAllFlowTemplates(domainPackIds),
+    getAllStages(domainPackIds),
+  ]);
 
   return (
     <AppShell

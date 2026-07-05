@@ -22,8 +22,8 @@ export function CollectShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="flex min-h-screen flex-col bg-sunken">
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
+    <div className="flex h-dvh flex-col bg-sunken">
+      <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center justify-between border-b border-border bg-surface px-4">
         <div className="flex items-center gap-2">
           <div className="flex size-7 items-center justify-center rounded-md bg-brand-500 text-[13px] font-bold text-white">P</div>
           <div className="min-w-0">
@@ -41,7 +41,7 @@ export function CollectShell({ children }: { children: React.ReactNode }) {
         </button>
       </header>
 
-      <main className="mx-auto w-full max-w-[480px] flex-1 overflow-y-auto px-4 pb-24 pt-4">{children}</main>
+      <main className="mx-auto w-full min-h-0 max-w-[480px] flex-1 overflow-y-auto px-4 pb-24 pt-4">{children}</main>
 
       <nav className="fixed inset-x-0 bottom-0 border-t border-border bg-surface">
         <div className="mx-auto flex w-full max-w-[480px]">

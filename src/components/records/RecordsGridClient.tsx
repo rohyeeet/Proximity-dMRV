@@ -62,7 +62,7 @@ export function RecordsGridClient({ form, submissions }: { form: FormTemplate; s
           options={filterOptions.map((option) => ({ ...option, count: counts[option.value as keyof typeof counts] }))}
         />
         {canReview(session.role.tier) && (
-          <a href={`/api/forms/${form.id}/export`} download>
+          <a href={`/api/forms/${form.id}/export?organizationId=${session.organization.id}`} download>
             <Button variant="secondary" size="sm">
               <Download className="size-3.5" /> Export to CSV
             </Button>

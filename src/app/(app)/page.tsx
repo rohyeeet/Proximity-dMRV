@@ -9,8 +9,7 @@ import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
 import { StatusChip } from "@/components/ui/StatusChip";
-import { analyticsCardsByOrg } from "@/data";
-import type { Submission } from "@/types";
+import type { AnalyticsCard, Submission } from "@/types";
 
 export default function OverviewPage() {
   const { session } = useSession();
@@ -19,21 +18,34 @@ export default function OverviewPage() {
   const domainPackId = session.organization.domainPackId;
 
   const [attention, setAttention] = useState<Submission[]>([]);
+  const [cards, setCards] = useState<AnalyticsCard[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/domain-packs/${domainPackId}/attention`)
-      .then((res) => res.json())
+    fetch(`/api/domain-packs/${domainPackId}/attention?organizationId=${orgId}`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Request failed: ${res.status}`))))
       .then((data: Submission[]) => {
-        if (!cancelled) setAttention(data);
+        if (!cancelled) setAttention(Array.isArray(data) ? data : []);
       })
       .catch((error) => console.error("Failed to load attention queue", error));
     return () => {
       cancelled = true;
     };
-  }, [domainPackId]);
+  }, [domainPackId, orgId]);
 
-  const cards = analyticsCardsByOrg[orgId] ?? [];
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/organizations/${orgId}/analytics`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Request failed: ${res.status}`))))
+      .then((data: { cards: AnalyticsCard[] }) => {
+        if (!cancelled) setCards(data.cards ?? []);
+      })
+      .catch((error) => console.error("Failed to load analytics cards", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [orgId]);
+
   const orgForms = forms.filter((form) => form.domainPackId === domainPackId);
   const orgFlow = flows.find((flow) => flow.domainPackId === domainPackId);
   const needsFix = attention.filter((s) => s.reviewStatus === "needs_fix");

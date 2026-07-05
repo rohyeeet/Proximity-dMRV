@@ -6,7 +6,12 @@ import { CollectShell } from "@/components/collect/CollectShell";
 
 export default async function CollectLayout({ children }: { children: React.ReactNode }) {
   const { user, accessibleOrgs, initialActiveOrganizationId } = await resolveSession();
-  const [initialForms, initialFlows, initialStages] = await Promise.all([getAllFormTemplates(), getAllFlowTemplates(), getAllStages()]);
+  const domainPackIds = [...new Set(accessibleOrgs.map((entry) => entry.organization.domainPackId))];
+  const [initialForms, initialFlows, initialStages] = await Promise.all([
+    getAllFormTemplates(domainPackIds),
+    getAllFlowTemplates(domainPackIds),
+    getAllStages(domainPackIds),
+  ]);
 
   return (
     <SessionProvider

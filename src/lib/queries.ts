@@ -4,6 +4,7 @@
  * the database is largely just swapping the import source.
  */
 import { prisma } from "@/lib/db";
+import type { Prisma } from "@prisma/client";
 import {
   toConnector,
   toDevice,
@@ -48,6 +49,55 @@ export function deriveLinkedSubmissionIds(fields: FormFieldDefinition[], answers
     .map((a) => a.value as string);
 }
 
+/** Same as deriveLinkedSubmissionIds, restricted to fields the Studio setup actually marked
+ * exclusive (linkedExclusive / lookupSource.excludeAlreadyLinked) — these are the ones that need a
+ * real-time re-check at write time, not just at picker-list time, so two submitters can't both
+ * claim the same upstream record. */
+export function deriveExclusiveLinkedSubmissionIds(fields: FormFieldDefinition[], answers: SubmissionAnswer[]): string[] {
+  const exclusiveFieldCodes = new Set(
+    fields
+      .filter(
+        (f) =>
+          (f.fieldType === "linked_record" && f.linkedExclusive) ||
+          (f.fieldType === "lookup_select" && f.lookupSource?.kind === "internal_form" && f.lookupSource.excludeAlreadyLinked)
+      )
+      .map((f) => f.fieldCode)
+  );
+  return answers
+    .filter((a) => exclusiveFieldCodes.has(a.fieldCode) && typeof a.value === "string" && a.value.trim() !== "")
+    .map((a) => a.value as string);
+}
+
+export class LinkedRecordConflictError extends Error {
+  constructor(public readonly conflictingIds: string[]) {
+    super("One or more linked records have already been claimed by another submission.");
+    this.name = "LinkedRecordConflictError";
+  }
+}
+
+/** Must run inside the same transaction as the submission write it's guarding, at Serializable
+ * isolation — a plain read-then-write has a gap where two concurrent submitters can both see a
+ * record as unclaimed and both link it. Serializable makes Postgres itself abort one of the two
+ * competing transactions (caught by the caller as a P2034 and surfaced as a 409) instead. */
+export async function assertLinksStillAvailable(
+  tx: Prisma.TransactionClient,
+  exclusiveIds: string[],
+  excludeSubmissionId?: string
+): Promise<void> {
+  if (exclusiveIds.length === 0) return;
+  const claimants = await tx.submission.findMany({
+    where: {
+      linkedSubmissionIds: { hasSome: exclusiveIds },
+      isTest: false,
+      ...(excludeSubmissionId ? { id: { not: excludeSubmissionId } } : {}),
+    },
+    select: { linkedSubmissionIds: true },
+  });
+  const claimed = new Set(claimants.flatMap((c) => c.linkedSubmissionIds));
+  const conflicts = exclusiveIds.filter((id) => claimed.has(id));
+  if (conflicts.length > 0) throw new LinkedRecordConflictError(conflicts);
+}
+
 export async function getRole(id: string): Promise<Role | undefined> {
   const row = await prisma.role.findUnique({ where: { id } });
   return row ? toRole(row) : undefined;
@@ -78,9 +128,9 @@ export async function getStage(id: string): Promise<Stage | undefined> {
   return row ? toStage(row) : undefined;
 }
 
-/** Every stage across every domain pack — used once to hydrate the client Studio store (see (app)/layout.tsx). */
-export async function getAllStages(): Promise<Stage[]> {
-  const rows = await prisma.stage.findMany({ orderBy: { sortOrder: "asc" } });
+/** Every stage across the caller's own accessible domain packs — see getAllFormTemplates. */
+export async function getAllStages(domainPackIds: string[]): Promise<Stage[]> {
+  const rows = await prisma.stage.findMany({ where: { domainPackId: { in: domainPackIds } }, orderBy: { sortOrder: "asc" } });
   return rows.map(toStage);
 }
 
@@ -132,9 +182,13 @@ export async function getFormTemplate(id: string): Promise<FormTemplate | undefi
   return toFormTemplate(row, version, counts);
 }
 
-/** Every form template across every domain pack — used once to hydrate the client Studio store. */
-export async function getAllFormTemplates(): Promise<FormTemplate[]> {
-  const rows = await prisma.formTemplate.findMany();
+/** Every form template across the caller's own accessible domain packs (their orgs' domain packs,
+ * or literally every domain pack for a platform admin, by construction of the caller's org list) —
+ * used once to hydrate the client Studio store. Never unscoped: a domain pack can be shared by
+ * several organizations, but a form/flow/stage design is still that domain pack owner's IP and
+ * must not leak to an org on a different domain pack. */
+export async function getAllFormTemplates(domainPackIds: string[]): Promise<FormTemplate[]> {
+  const rows = await prisma.formTemplate.findMany({ where: { domainPackId: { in: domainPackIds } } });
   const results: FormTemplate[] = [];
   for (const row of rows) {
     const version = await latestVersion(row.id);
@@ -155,25 +209,53 @@ export async function getFlowTemplate(id: string): Promise<FlowTemplate | undefi
   return row ? toFlowTemplate(row) : undefined;
 }
 
-/** Every flow template across every domain pack — used once to hydrate the client Studio store. */
-export async function getAllFlowTemplates(): Promise<FlowTemplate[]> {
-  const rows = await prisma.flowTemplate.findMany();
+/** Every flow template across the caller's own accessible domain packs — see getAllFormTemplates. */
+export async function getAllFlowTemplates(domainPackIds: string[]): Promise<FlowTemplate[]> {
+  const rows = await prisma.flowTemplate.findMany({ where: { domainPackId: { in: domainPackIds } } });
   return rows.map(toFlowTemplate);
 }
 
-export async function getSubmissionsByForm(formTemplateId: string): Promise<Submission[]> {
-  const rows = await prisma.submission.findMany({ where: { formTemplateId, isTest: false }, orderBy: { updatedAt: "desc" } });
+/**
+ * A domain pack (and therefore a form) can be shared by several organizations, so a form's
+ * submissions must always be scoped to the caller's own organization — never returned unscoped.
+ * Capped at 1000 rows; a real paginated Records view is a reasonable follow-up once any single
+ * org's history grows past that.
+ */
+export async function getSubmissionsByForm(formTemplateId: string, organizationId: string): Promise<Submission[]> {
+  const rows = await prisma.submission.findMany({
+    where: { formTemplateId, isTest: false, submittedBy: { memberships: { some: { organizationId, status: "active" } } } },
+    orderBy: { updatedAt: "desc" },
+    take: 1000,
+  });
   return rows.map(toSubmission);
 }
 
-export async function getTestSubmissionsByForm(formTemplateId: string): Promise<Submission[]> {
-  const rows = await prisma.submission.findMany({ where: { formTemplateId, isTest: true }, orderBy: { updatedAt: "desc" } });
+export async function getTestSubmissionsByForm(formTemplateId: string, organizationId: string): Promise<Submission[]> {
+  const rows = await prisma.submission.findMany({
+    where: { formTemplateId, isTest: true, submittedBy: { memberships: { some: { organizationId, status: "active" } } } },
+    orderBy: { updatedAt: "desc" },
+    take: 200,
+  });
   return rows.map(toSubmission);
 }
 
 export async function getSubmission(id: string): Promise<Submission | undefined> {
   const row = await prisma.submission.findUnique({ where: { id } });
   return row ? toSubmission(row) : undefined;
+}
+
+/** Filters a list of user ids down to the ones with active membership in organizationId — used to
+ * verify a submission (identified by its submittedByUserId) actually belongs to the caller's org
+ * before it's shown, since `getSubmission` itself is org-unaware (it's also used org-safely inside
+ * already-scoped flows like resubmit, which separately checks ownership). */
+export async function filterUserIdsByOrganization(userIds: string[], organizationId: string): Promise<Set<string>> {
+  const uniqueIds = [...new Set(userIds)];
+  if (uniqueIds.length === 0) return new Set();
+  const memberships = await prisma.orgMembership.findMany({
+    where: { userId: { in: uniqueIds }, organizationId, status: "active" },
+    select: { userId: true },
+  });
+  return new Set(memberships.map((m) => m.userId));
 }
 
 /** A submitter's own submission history for the Collect app's "My submissions" list. */

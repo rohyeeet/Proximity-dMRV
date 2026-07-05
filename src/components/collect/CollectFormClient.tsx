@@ -63,10 +63,13 @@ export function CollectFormClient({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ answers: payload, evidence: evidence.filter((e) => usedEvidenceIds.has(e.id)) }),
       });
-      if (!res.ok) throw new Error(await res.text());
+      if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new Error(typeof body?.error === "string" ? body.error : "Something went wrong submitting this form. Please try again.");
+      }
       setSubmitted(true);
     } catch (err) {
-      setError("Something went wrong submitting this form. Please try again.");
+      setError(err instanceof Error ? err.message : "Something went wrong submitting this form. Please try again.");
       console.error(err);
     } finally {
       setSubmitting(false);

@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { toSubmission } from "@/lib/mappers";
-import { deriveLinkedSubmissionIds, getFormTemplateVersionFields } from "@/lib/queries";
+import { assertLinksStillAvailable, deriveExclusiveLinkedSubmissionIds, deriveLinkedSubmissionIds, getFormTemplateVersionFields, LinkedRecordConflictError } from "@/lib/queries";
 import type { EvidenceFile, SubmissionAnswer, SubmissionVersionRecord } from "@/types";
 
 /** A submitter fixing and resending a submission a reviewer returned for correction. Only the
@@ -31,22 +32,38 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const priorVersions = existing.versions as unknown as SubmissionVersionRecord[];
   const fields = (await getFormTemplateVersionFields(existing.formTemplateId, existing.formTemplateVersionNo)) ?? [];
   const linkedSubmissionIds = deriveLinkedSubmissionIds(fields, answers);
+  const exclusiveLinkedIds = deriveExclusiveLinkedSubmissionIds(fields, answers);
 
-  const updated = await prisma.submission.update({
-    where: { id },
-    data: {
-      currentVersionNo: nextVersionNo,
-      reviewStatus: "needs_check",
-      updatedAt: now,
-      answers: answers as object,
-      evidence: evidence as object,
-      linkedSubmissionIds,
-      versions: [
-        ...priorVersions,
-        { versionNo: nextVersionNo, answers, createdAt: now.toISOString(), createdByUserId: session.user.id, reason: "Resubmitted after correction" },
-      ] as object,
-    },
-  });
-
-  return NextResponse.json(toSubmission(updated));
+  try {
+    const updated = await prisma.$transaction(
+      async (tx) => {
+        await assertLinksStillAvailable(tx, exclusiveLinkedIds, id);
+        return tx.submission.update({
+          where: { id },
+          data: {
+            currentVersionNo: nextVersionNo,
+            reviewStatus: "needs_check",
+            updatedAt: now,
+            answers: answers as object,
+            evidence: evidence as object,
+            linkedSubmissionIds,
+            versions: [
+              ...priorVersions,
+              { versionNo: nextVersionNo, answers, createdAt: now.toISOString(), createdByUserId: session.user.id, reason: "Resubmitted after correction" },
+            ] as object,
+          },
+        });
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
+    );
+    return NextResponse.json(toSubmission(updated));
+  } catch (error) {
+    if (error instanceof LinkedRecordConflictError) {
+      return NextResponse.json({ error: "One of the records you selected was just linked by another submission. Please pick again." }, { status: 409 });
+    }
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034") {
+      return NextResponse.json({ error: "This submission conflicted with another in-flight change. Please try again." }, { status: 409 });
+    }
+    throw error;
+  }
 }

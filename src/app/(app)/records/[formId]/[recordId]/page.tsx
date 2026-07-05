@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
-import { getFormTemplate, getFormTemplateVersionFields, getSubmission, getUser } from "@/lib/queries";
+import { filterUserIdsByOrganization, getFormTemplate, getFormTemplateVersionFields, getSubmission, getUser } from "@/lib/queries";
+import { resolveSession } from "@/lib/session-server";
 import { RecordDetailClient } from "@/components/records/RecordDetailClient";
 
 export default async function RecordDetailPage({ params }: { params: Promise<{ formId: string; recordId: string }> }) {
   const { formId, recordId } = await params;
+  const { initialActiveOrganizationId } = await resolveSession();
   const [form, submission] = await Promise.all([getFormTemplate(formId), getSubmission(recordId)]);
   if (!form || !submission || submission.formTemplateId !== formId) notFound();
+
   const [submitter, pinnedFields] = await Promise.all([
     getUser(submission.submittedByUserId),
     getFormTemplateVersionFields(formId, submission.formTemplateVersionNo),
@@ -19,8 +22,19 @@ export default async function RecordDetailPage({ params }: { params: Promise<{ f
     .filter((a) => linkFieldCodes.has(a.fieldCode) && typeof a.value === "string" && a.value)
     .map((a) => a.value as string);
   const linkedSubmissions = await Promise.all(linkedIds.map((id) => getSubmission(id)));
+
+  // A submission (and anything it links to) may only be shown if its submitter belongs to the
+  // caller's own active organization — forms/domain packs can be shared across orgs, submissions never are.
+  const allowedUserIds = await filterUserIdsByOrganization(
+    [submission.submittedByUserId, ...linkedSubmissions.filter((s) => s !== undefined).map((s) => s!.submittedByUserId)],
+    initialActiveOrganizationId
+  );
+  if (!allowedUserIds.has(submission.submittedByUserId)) notFound();
+
   const linkedRecordsById = Object.fromEntries(
-    linkedSubmissions.filter((s) => s !== undefined).map((s) => [s!.id, { formTemplateId: s!.formTemplateId, displayId: s!.displayId }])
+    linkedSubmissions
+      .filter((s) => s !== undefined && allowedUserIds.has(s.submittedByUserId))
+      .map((s) => [s!.id, { formTemplateId: s!.formTemplateId, displayId: s!.displayId }])
   );
 
   return (

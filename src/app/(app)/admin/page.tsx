@@ -20,6 +20,7 @@ export default function AdminOverviewPage() {
   const { setActiveOrganizationId } = useSession();
   const [organizations, setOrganizations] = useState<AdminOrgRow[]>([]);
   const [domainPacks, setDomainPacks] = useState<DomainPack[]>([]);
+  const [deviceCount, setDeviceCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,12 +30,13 @@ export default function AdminOverviewPage() {
           router.replace("/");
           return null;
         }
-        return res.json();
+        return res.ok ? res.json() : Promise.reject(new Error(`Request failed: ${res.status}`));
       })
-      .then((data: { organizations: AdminOrgRow[]; domainPacks: DomainPack[] } | null) => {
+      .then((data: { organizations: AdminOrgRow[]; domainPacks: DomainPack[]; deviceCount: number } | null) => {
         if (data && !cancelled) {
           setOrganizations(data.organizations);
           setDomainPacks(data.domainPacks);
+          setDeviceCount(data.deviceCount);
         }
       })
       .catch((error) => console.error("Failed to load admin overview", error));
@@ -46,7 +48,7 @@ export default function AdminOverviewPage() {
   const platformCards: AnalyticsCard[] = [
     { key: "orgs", label: "Organizations", value: String(organizations.length), tone: "neutral" },
     { key: "domain_packs", label: "Domain packs", value: String(domainPacks.length), tone: "neutral" },
-    { key: "connected_devices", label: "Devices connected", value: "5", tone: "good" },
+    { key: "connected_devices", label: "Devices connected", value: String(deviceCount), tone: "good" },
     { key: "trial_orgs", label: "Trial organizations", value: String(organizations.filter((o) => o.status === "trial").length), tone: "warn" },
   ];
 
