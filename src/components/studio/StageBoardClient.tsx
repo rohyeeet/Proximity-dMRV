@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowRight, ArrowUp, BookOpen, Plus, Trash2 } from "lucide-react";
 import { useSession } from "@/lib/session";
-import { useStudio } from "@/lib/studio";
+import { useStudio, pickActiveFlow } from "@/lib/studio";
 import { canEditStudio, canDeleteStage } from "@/lib/permissions";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { Button } from "@/components/ui/Button";
@@ -53,7 +53,7 @@ function StageBoardInner() {
   const orgStages = stages.filter((stage) => stage.domainPackId === domainPackId);
   const stagedFormIds = new Set(orgStages.flatMap((stage) => stage.formTemplateIds));
   const availableForms = forms.filter((form) => form.domainPackId === domainPackId && !stagedFormIds.has(form.id));
-  const domainFlow = flows.find((flow) => flow.domainPackId === domainPackId);
+  const domainFlow = pickActiveFlow(flows, domainPackId);
 
   async function handleViewFlow() {
     if (domainFlow) {

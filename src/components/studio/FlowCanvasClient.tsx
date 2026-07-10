@@ -36,7 +36,7 @@ import { BookOpen, RefreshCw, Maximize2, Minimize2, LayoutGrid, CheckCircle2 } f
 import { autoArrangeFlow, validateFlow, type FlowIssue } from "@/lib/graph-utils";
 import { syncFlowWithStages } from "@/lib/flow-sync";
 import { cn, genId } from "@/lib/utils";
-import type { FlowNodeDefinition, FlowNodeType, FlowTemplate } from "@/types";
+import type { FlowNodeDefinition, FlowNodeType, FlowTemplate, Role } from "@/types";
 
 const nodeTypes = { flowNode: FlowNode };
 
@@ -124,6 +124,20 @@ function FlowCanvasInner({ flowId }: { flowId: string }) {
   const [syncSummary, setSyncSummary] = useState<string[] | null>(null);
   const [paletteCollapsed, setPaletteCollapsed] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [roles, setRoles] = useState<Role[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/organizations/${session.organization.id}/roles`)
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`Request failed: ${res.status}`))))
+      .then((data: Role[]) => {
+        if (!cancelled) setRoles(data);
+      })
+      .catch((error) => console.error("Failed to load roles", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [session.organization.id]);
 
   function refitView() {
     window.setTimeout(() => reactFlow.fitView({ padding: 0.15, duration: 300 }), 50);
@@ -433,6 +447,7 @@ function FlowCanvasInner({ flowId }: { flowId: string }) {
               <FlowNodeInspector
                 node={selectedNode}
                 domainPackId={flow.domainPackId}
+                roles={roles}
                 onChange={(patch) => updateFlow(flow.id, (prev) => ({ ...prev, nodes: prev.nodes.map((n) => (n.id === selectedNode.id ? { ...n, ...patch } : n)) }))}
                 onDelete={() => deleteNode(selectedNode.id)}
                 onAddSuggested={canEdit ? handleAddNode : undefined}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 import { useSession } from "@/lib/session";
-import { useStudio } from "@/lib/studio";
+import { useStudio, pickActiveFlow } from "@/lib/studio";
 import { PageHeader } from "@/components/ui/PageHeader";
 import { MetricCard } from "@/components/ui/MetricCard";
 import { Card, CardHeader, CardBody } from "@/components/ui/Card";
@@ -48,7 +48,7 @@ export default function OverviewPage() {
     };
   }, [orgId]);
 
-  const orgFlow = flows.find((flow) => flow.domainPackId === domainPackId);
+  const orgFlow = pickActiveFlow(flows, domainPackId);
 
   const orgFlowId = orgFlow?.id;
   useEffect(() => {

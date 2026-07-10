@@ -18,6 +18,19 @@ interface StageEntry {
   dirty: boolean;
 }
 
+/**
+ * The one flow that actually drives real behavior for a domain pack — Collect's assigned-work
+ * list and the Overview flow summary both need exactly one answer, but a domain pack can have
+ * more than one `FlowTemplate` row (e.g. someone clicked "New flow" to sketch an alternative
+ * without ever meaning to replace the real one). Prefers a published flow over a draft, then the
+ * highest version number — the flow that's actually been iterated on and shipped, not whichever
+ * row a plain `.find()` happens to return first. */
+export function pickActiveFlow(flows: FlowTemplate[], domainPackId: string): FlowTemplate | undefined {
+  return flows
+    .filter((flow) => flow.domainPackId === domainPackId)
+    .sort((a, b) => Number(b.status === "published") - Number(a.status === "published") || b.versionNo - a.versionNo)[0];
+}
+
 function keyBy<T extends { id: string }>(items: T[]): Record<string, { data: T; dirty: boolean }> {
   return Object.fromEntries(items.map((item) => [item.id, { data: item, dirty: false }]));
 }

@@ -130,6 +130,13 @@ export async function getRole(id: string): Promise<Role | undefined> {
   return row ? toRole(row) : undefined;
 }
 
+/** Every real role defined for one organization — used to show actual job titles (e.g. "Field
+ * Surveyor") instead of raw tier codes wherever a tier is picked, e.g. Flow Studio's node inspector. */
+export async function getRolesByOrganization(organizationId: string): Promise<Role[]> {
+  const rows = await prisma.role.findMany({ where: { organizationId } });
+  return rows.map(toRole);
+}
+
 export async function getUser(id: string): Promise<User | undefined> {
   const row = await prisma.user.findUnique({ where: { id } });
   return row ? toUser(row) : undefined;

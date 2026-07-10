@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardList, ChevronRight, AlertTriangle, Clock } from "lucide-react";
 import { useSession } from "@/lib/session";
-import { useStudio } from "@/lib/studio";
+import { useStudio, pickActiveFlow } from "@/lib/studio";
 import { getAssignedWork } from "@/lib/collect";
 import type { Submission } from "@/types";
 
@@ -20,7 +20,7 @@ export default function CollectHomePage() {
       .catch((error) => console.error("Failed to load my submissions", error));
   }, []);
 
-  const flow = flows.find((f) => f.domainPackId === session.organization.domainPackId);
+  const flow = pickActiveFlow(flows, session.organization.domainPackId);
   const assigned = getAssignedWork(flow, forms, stages, session.role.tier);
 
   const needsFixCount = mySubmissions?.filter((s) => s.reviewStatus === "needs_fix").length ?? 0;

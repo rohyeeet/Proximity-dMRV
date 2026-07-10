@@ -22,7 +22,10 @@ const ORG_COOKIE = "activeOrganizationId";
  * `accessibleOrgs` and `user` are resolved server-side (see src/app/(app)/layout.tsx) from the
  * real authenticated session + database — a platform admin gets every organization paired with
  * the platform role, everyone else gets exactly the organizations/roles their OrgMemberships
- * grant. Switching orgs client-side is just picking from this pre-fetched list, no refetch needed.
+ * grant. Switching orgs (which one is `session.organization`) is instant client-side, just picking
+ * from this pre-fetched list — but the Studio store (forms/flows/stages) is scoped server-side to
+ * whichever org is active, so callers of `setActiveOrganizationId` must also trigger a server
+ * refresh (see OrgSwitcher.tsx's `router.refresh()`) or the previous org's Studio data lingers.
  */
 export function SessionProvider({
   user,

@@ -13,7 +13,13 @@ export default async function AppGroupLayout({ children }: { children: React.Rea
     redirect("/collect");
   }
 
-  const domainPackIds = [...new Set(accessibleOrgs.map((entry) => entry.organization.domainPackId))];
+  // Scoped to the *currently managed* organization's own domain pack only — never every domain
+  // pack the caller can reach (that would leak another organization's forms/flows/stages into the
+  // Studio store just because a platform admin, or a user with several real memberships, happens
+  // to have access to it too). Switching "Managing" orgs (OrgSwitcher.tsx) triggers a fresh server
+  // render of this layout, so this always reflects whichever org is actually active.
+  const activeOrg = accessibleOrgs.find((entry) => entry.organization.id === initialActiveOrganizationId)?.organization ?? accessibleOrgs[0]!.organization;
+  const domainPackIds = [activeOrg.domainPackId];
   const [initialForms, initialFlows, initialStages] = await Promise.all([
     getAllFormTemplates(domainPackIds),
     getAllFlowTemplates(domainPackIds),

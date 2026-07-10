@@ -1,26 +1,31 @@
 "use client";
 
+import { useEffect } from "react";
 import { Trash2, X } from "lucide-react";
 import { EntityPicker } from "./EntityPicker";
 import { FieldPicker } from "./FieldPicker";
 import { InfoHint } from "./knowledge/InfoHint";
 import { flowNodeMetaByType, suggestedNextTypes } from "./flow-node-catalog";
 import { useStudio } from "@/lib/studio";
-import type { FlowNodeDefinition, FlowNodeType, TrackerAggregation } from "@/types";
+import type { FlowNodeDefinition, FlowNodeType, Role, RoleTier, TrackerAggregation } from "@/types";
 
-const roleTierOptions = ["submitter", "reviewer", "org_admin", "org_sub_admin", "designer", "viewer"];
+const roleTierOptions: RoleTier[] = ["submitter", "reviewer", "org_admin", "org_sub_admin", "designer", "viewer"];
 
 const trackerAggregationLabels: Record<TrackerAggregation, string> = { sum: "SUM", avg: "AVG", min: "MIN", max: "MAX" };
 
 export function FlowNodeInspector({
   node,
   domainPackId,
+  roles,
   onChange,
   onDelete,
   onAddSuggested,
 }: {
   node: FlowNodeDefinition;
   domainPackId: string;
+  /** The current organization's real roles — used to show job-title labels ("Field Surveyor")
+   * instead of raw tier codes in the "Assigned role tier" select below. */
+  roles: Role[];
   onChange: (patch: Partial<FlowNodeDefinition>) => void;
   onDelete: () => void;
   onAddSuggested?: (nodeType: FlowNodeType) => void;
@@ -29,6 +34,17 @@ export function FlowNodeInspector({
   const linkedForm = node.formTemplateId ? getForm(node.formTemplateId) : undefined;
   const sourceStage = node.sourceStageId ? getStage(node.sourceStageId) : undefined;
   const supportsFormLink = node.nodeType === "form_step" || node.nodeType === "automation" || node.nodeType === "document";
+  const roleNameByTier = new Map(roles.map((r) => [r.tier, r.name]));
+
+  // Self-heals a node's label to its linked form's real name whenever the label is still the
+  // generic node-type default (or blank) — covers both a freshly-linked form and an older node
+  // that was never renamed, without touching a label someone has deliberately customized.
+  useEffect(() => {
+    if (!linkedForm) return;
+    const isGenericLabel = node.label.trim() === "" || node.label === flowNodeMetaByType[node.nodeType].label;
+    if (isGenericLabel && node.label !== linkedForm.name) onChange({ label: linkedForm.name });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.id, node.formTemplateId, linkedForm?.name]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -80,7 +96,7 @@ export function FlowNodeInspector({
           <option value="">Unassigned</option>
           {roleTierOptions.map((tier) => (
             <option key={tier} value={tier}>
-              {tier.replace(/_/g, " ")}
+              {roleNameByTier.get(tier) ?? tier.replace(/_/g, " ")}
             </option>
           ))}
         </select>
