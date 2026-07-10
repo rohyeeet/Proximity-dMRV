@@ -281,10 +281,11 @@ the forms assigned to that person and their own submission history:
 ### Records
 One row-wise table per form, not a form-by-form review queue — every question is a column, so
 reviewing and reporting happen in the same screen instead of opening each record individually:
-- **Type-aware cells** — a photo/document/signature answer is a chip that opens its capture
-  metadata (timestamp, geotag, file size); a `geo_point`/`geo_boundary` answer opens a real Leaflet
-  map over satellite imagery (with a road/place labels overlay), rendering the actual captured
-  polygon — not a raw coordinate dump.
+- **Type-aware cells, expanded inline** — a photo/document/signature or `geo_point`/`geo_boundary`
+  answer is a chip that expands an enlarged panel directly beneath its row (capture metadata, or a
+  real Leaflet map over satellite imagery with a road/place labels overlay, rendering the actual
+  captured polygon) — a fluid accordion, not a modal, so the rest of the table stays visible and
+  scrollable while reviewing the detail in depth.
 - **Two review paths per row** — **Accept** the whole record in one click, or **Mark incorrect** to
   open a side panel and flag which *specific* answers are wrong with a remark per one; the flagged
   fields and remarks are surfaced back to the submitter on their own resubmit screen.

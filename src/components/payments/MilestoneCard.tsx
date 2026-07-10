@@ -358,11 +358,11 @@ export function MilestoneCard({
                     href={file.fileRef}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-sunken px-2 py-1 text-[12px] text-ink hover:bg-sunken/70"
+                    className="inline-flex max-w-full items-center gap-1.5 rounded-md border border-border bg-sunken px-2 py-1 text-[12px] text-ink hover:bg-sunken/70 sm:max-w-[280px]"
                   >
-                    <FileText className="size-3.5 text-ink-soft" />
-                    {file.fileName}
-                    <span className="text-ink-soft">· {EVIDENCE_SOURCE_TYPE_LABELS[file.sourceType]}</span>
+                    <FileText className="size-3.5 shrink-0 text-ink-soft" />
+                    <span className="min-w-0 flex-1 truncate">{file.fileName}</span>
+                    <span className="shrink-0 text-ink-soft">· {EVIDENCE_SOURCE_TYPE_LABELS[file.sourceType]}</span>
                   </a>
                 ))}
               </div>
