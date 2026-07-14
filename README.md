@@ -34,23 +34,27 @@ All captured live against the real Postgres-backed app (seeded demo data, not mo
 
 | | |
 |---|---|
-| **Sign in** | **Overview dashboard** |
+| **Sign in** | **Overview dashboard — stage tracker, metric deltas** |
 | ![Login](docs/screenshots/01-login.png) | ![Dashboard](docs/screenshots/02-dashboard.png) |
-| **Forms & Stages** | **Form builder** |
-| ![Stage board](docs/screenshots/03-stage-board.png) | ![Form builder](docs/screenshots/04-form-builder.png) |
-| **Flow Studio** | **Records — row-wise validation table** |
-| ![Flow Studio](docs/screenshots/06-flow-studio.png) | ![Records grid](docs/screenshots/08-records-grid.png) |
+| **Projects — a project's own Flow and Payments** | **Forms & Stages** |
+| ![Projects](docs/screenshots/02b-projects.png) | ![Stage board](docs/screenshots/03-stage-board.png) |
+| **Form builder** | **Flow Studio** |
+| ![Form builder](docs/screenshots/04-form-builder.png) | ![Flow Studio](docs/screenshots/06-flow-studio.png) |
+| **Payment step — milestone template + live ledger** | **Records — row-wise validation table** |
+| ![Payment step node](docs/screenshots/06b-flow-payment-step.png) | ![Records grid](docs/screenshots/08-records-grid.png) |
 | **Reviewing a captured geo-boundary, in place** | **Connectors** |
 | ![Geo boundary review popover](docs/screenshots/08b-validation-detail.png) | ![Connectors](docs/screenshots/09-connectors.png) |
-| **Analytics (computed live)** | **Team & Access** |
-| ![Analytics](docs/screenshots/10-analytics.png) | ![Team & Access](docs/screenshots/11-team.png) |
-| **Admin — platform overview** | **Collect app (field submitter, mobile)** |
-| ![Admin](docs/screenshots/12-admin.png) | ![Collect](docs/screenshots/13-collect-mobile.png) |
-| **My submissions (mobile)** | **Filling a form with real device capture (mobile)** |
-| ![My submissions](docs/screenshots/14-collect-submissions-mobile.png) | ![Collect form](docs/screenshots/15-collect-form-mobile.png) |
-| **Payments — offtake agreements list** | **Payments — milestone detail (claims, consent, payouts, escrow)** |
-| ![Payments list](docs/screenshots/16-payments-list.png) | ![Payments detail](docs/screenshots/17-payments-detail.png) |
-| **Payments, from a ground partner's phone** | |
+| **Marketplace — Science & Data Integrations** | **Analytics (computed live)** |
+| ![Marketplace](docs/screenshots/09b-marketplace.png) | ![Analytics](docs/screenshots/10-analytics.png) |
+| **Team & Access** | **Admin — platform overview** |
+| ![Team & Access](docs/screenshots/11-team.png) | ![Admin](docs/screenshots/12-admin.png) |
+| **Collect app (field submitter, mobile)** | **My submissions (mobile)** |
+| ![Collect](docs/screenshots/13-collect-mobile.png) | ![My submissions](docs/screenshots/14-collect-submissions-mobile.png) |
+| **Filling a form with real device capture (mobile)** | **Payments — milestone templates (the single lever)** |
+| ![Collect form](docs/screenshots/15-collect-form-mobile.png) | ![Payments milestone templates](docs/screenshots/16-payments-list.png) |
+| **Payments — live ledger, per role** | **Payments — milestone detail (claims, consent, payouts, escrow)** |
+| ![Payments ledger](docs/screenshots/16b-payments-ledger.png) | ![Payments detail](docs/screenshots/17-payments-detail.png) |
+| **Payments, role-scoped ledger from a ground partner's phone** | |
 | ![Payments mobile](docs/screenshots/18-payments-mobile.png) | |
 
 ## What it does

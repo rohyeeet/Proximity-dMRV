@@ -31,6 +31,8 @@ import {
   escrowAccounts,
   paymentAuditSeedEvents,
   serviceListings,
+  milestoneTemplates,
+  milestoneTemplateSplits,
 } from "../src/data";
 import { computeHash, GENESIS_HASH } from "../src/lib/payment-audit";
 import { genId } from "../src/lib/utils";
@@ -385,6 +387,28 @@ async function main() {
       update: { status: milestone.status },
     });
   }
+  for (const template of milestoneTemplates) {
+    await prisma.milestoneTemplate.upsert({
+      where: { id: template.id },
+      create: {
+        id: template.id,
+        projectId: template.projectId,
+        type: template.type,
+        label: template.label,
+        percentOfTotal: template.percentOfTotal,
+        verificationSource: template.verificationSource,
+        order: template.order,
+      },
+      update: { label: template.label, percentOfTotal: template.percentOfTotal },
+    });
+  }
+  for (const split of milestoneTemplateSplits) {
+    await prisma.milestoneTemplateSplit.upsert({
+      where: { id: split.id },
+      create: { id: split.id, milestoneTemplateId: split.milestoneTemplateId, participantRole: split.participantRole, percent: split.percent },
+      update: { percent: split.percent },
+    });
+  }
   for (const recipient of payoutRecipients) {
     await prisma.payoutRecipient.upsert({
       where: { id: recipient.id },
@@ -530,6 +554,7 @@ async function main() {
     }
   }
   console.log(`✓ ${paymentAgreements.length} payment agreement(s) (+ milestones, claims, consents, payouts, escrow, audit trail)`);
+  console.log(`✓ ${milestoneTemplates.length} milestone templates (+ split rules)`);
 
   for (const listing of serviceListings) {
     await prisma.serviceListing.upsert({

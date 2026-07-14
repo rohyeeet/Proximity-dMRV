@@ -124,10 +124,18 @@ export function MarketplaceClient({ listings }: { listings: ServiceListing[] }) 
     });
   }, [listings, activeCategory, search]);
 
+  // Grouped in the same curated category order as the sidebar filter (not the underlying query's
+  // alphabetical-by-slug order, which would otherwise put "Enhanced Weathering" before "Soil
+  // Carbon Modeling" purely because "erw_..." sorts before "soil_...").
   const grouped = useMemo(() => {
-    const map = new Map<ServiceCategory, ServiceListing[]>();
-    for (const listing of filteredListings) map.set(listing.category, [...(map.get(listing.category) ?? []), listing]);
-    return map;
+    const byCategory = new Map<ServiceCategory, ServiceListing[]>();
+    for (const listing of filteredListings) byCategory.set(listing.category, [...(byCategory.get(listing.category) ?? []), listing]);
+    const ordered = new Map<ServiceCategory, ServiceListing[]>();
+    for (const category of Object.keys(SERVICE_CATEGORY_LABELS) as ServiceCategory[]) {
+      const items = byCategory.get(category);
+      if (items) ordered.set(category, items);
+    }
+    return ordered;
   }, [filteredListings]);
 
   async function toggle(listing: ServiceListing) {

@@ -3,6 +3,8 @@ import type {
   EvidenceAttachment,
   Milestone,
   MilestoneClaim,
+  MilestoneTemplate,
+  MilestoneTemplateSplit,
   PaymentAgreement,
   PaymentAgreementParty,
   PayoutInstruction,
@@ -88,6 +90,53 @@ export const milestones: Milestone[] = [
     status: "claim_submitted",
   },
 ];
+
+/**
+ * The "single lever" for this project — authored once, before any real agreement exists, so a
+ * flow's payment_step node has something real to reference and a new agreement can be built by
+ * checklist instead of hand-typed. Mirrors the seeded Kaveri agreement's own milestone/split
+ * structure (20/30/50%, 8/60/27/5) almost exactly, since that agreement predates templates and
+ * used freehand values — this is what it would look like authored the current way.
+ */
+export const milestoneTemplates: MilestoneTemplate[] = [
+  {
+    id: "milestone-template-kaveri-capex",
+    projectId: "project-default-org-varaha-south",
+    type: "setup_capex",
+    label: "Plant commissioned",
+    percentOfTotal: 20,
+    verificationSource: "site_inspection",
+    order: 1,
+    splitRules: [],
+  },
+  {
+    id: "milestone-template-kaveri-achievement",
+    projectId: "project-default-org-varaha-south",
+    type: "achievement",
+    label: "First 1,000t biochar produced and field-applied",
+    percentOfTotal: 30,
+    verificationSource: "ops_data_review",
+    order: 2,
+    splitRules: [],
+  },
+  {
+    id: "milestone-template-kaveri-monitoring",
+    projectId: "project-default-org-varaha-south",
+    type: "monitoring_cycle",
+    label: "Puro.earth issues credits",
+    percentOfTotal: 50,
+    verificationSource: "registry_portal_confirmation",
+    order: 3,
+    splitRules: [],
+  },
+];
+
+export const milestoneTemplateSplits: MilestoneTemplateSplit[] = milestoneTemplates.flatMap((template) => [
+  { id: `${template.id}-split-platform`, milestoneTemplateId: template.id, participantRole: "platform", percent: 8 },
+  { id: `${template.id}-split-developer`, milestoneTemplateId: template.id, participantRole: "developer", percent: 60 },
+  { id: `${template.id}-split-farmer`, milestoneTemplateId: template.id, participantRole: "farmer_community", percent: 27 },
+  { id: `${template.id}-split-investor`, milestoneTemplateId: template.id, participantRole: "investor", percent: 5 },
+]);
 
 export const RECIPIENT_DEVELOPER_ID = "recipient-kaveri-dev";
 export const RECIPIENT_FARMER_ID = "recipient-kaveri-farmer";
